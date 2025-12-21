@@ -276,13 +276,6 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        elevation: 0,
-        title: Text(
-          _isConfirming ? 'Confirm PIN' : 'Set PIN',
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
-      ),
       body: Container(
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -351,35 +344,37 @@ class _PinSetupScreenState extends State<PinSetupScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(4, (index) {
                     final isFilled = (_isConfirming ? _confirmPin.length : _enteredPin.length) > index;
-                    return Container(
-                      width: 70,
-                      height: 70,
-                      margin: const EdgeInsets.symmetric(horizontal: 8),
-                      child: TextField(
-                        controller: _controllers[index],
-                        focusNode: _focusNodes[index],
-                        textAlign: TextAlign.center,
-                        keyboardType: TextInputType.number,
-                        maxLength: 1,
-                        obscureText: true,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                        ],
-                        decoration: InputDecoration(
-                          counterText: '',
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: BorderSide.none,
+                    return Expanded(
+                      child: Container(
+                        width: 70,
+                        height: 70,
+                        margin: const EdgeInsets.symmetric(horizontal: 8),
+                        child: TextField(
+                          controller: _controllers[index],
+                          focusNode: _focusNodes[index],
+                          textAlign: TextAlign.center,
+                          keyboardType: TextInputType.number,
+                          maxLength: 1,
+                          obscureText: true,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
                           ),
-                          filled: true,
-                          fillColor: isFilled ? Theme.of(context).colorScheme.primary : Colors.grey.shade100,
-                          contentPadding: EdgeInsets.zero,
+                          inputFormatters: [
+                            FilteringTextInputFormatter.digitsOnly,
+                          ],
+                          decoration: InputDecoration(
+                            counterText: '',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(16),
+                              borderSide: BorderSide.none,
+                            ),
+                            filled: true,
+                            fillColor: isFilled ? Theme.of(context).colorScheme.primary : Colors.grey.shade100,
+                            contentPadding: EdgeInsets.zero,
+                          ),
+                          onChanged: (value) => _onPinChanged(index, value),
                         ),
-                        onChanged: (value) => _onPinChanged(index, value),
                       ),
                     );
                   }),
