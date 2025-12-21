@@ -3,7 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'services/auth_service.dart';
 import 'screens/login_screen.dart';
-import 'screens/groups_screen.dart';
+import 'screens/pin_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -46,8 +46,8 @@ class AuthWrapper extends StatelessWidget {
         }
 
         if (snapshot.hasData) {
-          // User is logged in
-          return const GroupsScreen();
+          // User is logged in - show PIN wrapper
+          return const PinWrapper();
         } else {
           // User is not logged in
           return const LoginScreen();

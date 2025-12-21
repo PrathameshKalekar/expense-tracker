@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
+import '../services/biometric_service.dart';
+import '../services/secure_storage_service.dart';
 import '../models/group_model.dart';
 import 'expenses_screen.dart';
+import 'pin_setup_screen.dart';
 
 class GroupsScreen extends StatefulWidget {
   const GroupsScreen({super.key});
@@ -14,12 +17,97 @@ class GroupsScreen extends StatefulWidget {
 class _GroupsScreenState extends State<GroupsScreen> {
   final _firestoreService = FirestoreService();
   final _authService = AuthService();
+  final _biometricService = BiometricService();
   final _groupNameController = TextEditingController();
 
   @override
   void dispose() {
     _groupNameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _showBiometricSettings() async {
+    final isSupported = await _biometricService.isDeviceSupported();
+    final canCheck = await _biometricService.canCheckBiometrics();
+    final isEnabled = await SecureStorageService().isBiometricEnabled();
+    final isAvailable = isSupported && canCheck;
+
+    if (!isAvailable) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Biometric authentication is not available on this device'),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Biometric Authentication'),
+          content: Text(
+            isEnabled
+                ? 'Biometric authentication is currently enabled. Do you want to disable it?'
+                : 'Do you want to enable biometric authentication? You can use fingerprint or face ID to unlock the app.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            if (isEnabled)
+              ElevatedButton(
+                onPressed: () async {
+                  await SecureStorageService().setBiometricEnabled(false);
+                  if (mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Biometric authentication disabled'),
+                      ),
+                    );
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                ),
+                child: const Text('Disable'),
+              )
+            else
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(context);
+                  // Test biometric authentication
+                  final testResult = await _biometricService.authenticate();
+                  if (testResult) {
+                    await SecureStorageService().setBiometricEnabled(true);
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Biometric authentication enabled successfully'),
+                        ),
+                      );
+                    }
+                  } else {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Biometric authentication test failed. Please try again.'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  }
+                },
+                child: const Text('Enable'),
+              ),
+          ],
+        ),
+      );
+    }
   }
 
   void _showCreateGroupDialog() {
@@ -71,57 +159,65 @@ class _GroupsScreenState extends State<GroupsScreen> {
     );
   }
 
-  void _deleteGroup(GroupModel group) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Group'),
-        content: Text('Are you sure you want to delete "${group.name}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              try {
-                await _firestoreService.deleteGroup(group.id);
-                if (mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Group deleted')),
-                  );
-                }
-              } catch (e) {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Error: ${e.toString()}')),
-                  );
-                }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Expense Groups'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await _authService.signOut();
+          PopupMenuButton(
+            icon: const Icon(Icons.more_vert),
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'pin',
+                child: Row(
+                  children: [
+                    Icon(Icons.lock_outline),
+                    SizedBox(width: 8),
+                    Text('Change PIN'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'biometric',
+                child: Row(
+                  children: [
+                    Icon(Icons.fingerprint),
+                    SizedBox(width: 8),
+                    Text('Biometric Settings'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'logout',
+                child: Row(
+                  children: [
+                    Icon(Icons.logout),
+                    SizedBox(width: 8),
+                    Text('Logout'),
+                  ],
+                ),
+              ),
+            ],
+            onSelected: (value) async {
+              if (value == 'pin') {
+                final result = await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => const PinSetupScreen(),
+                  ),
+                );
+                if (result == true && mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('PIN updated successfully')),
+                  );
+                }
+              } else if (value == 'biometric') {
+                await _showBiometricSettings();
+              } else if (value == 'logout') {
+                await _authService.signOut();
+              }
             },
-            tooltip: 'Logout',
           ),
         ],
       ),
@@ -184,10 +280,6 @@ class _GroupsScreenState extends State<GroupsScreen> {
                   ),
                   subtitle: Text(
                     'Created ${_formatDate(group.createdAt)}',
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
-                    onPressed: () => _deleteGroup(group),
                   ),
                   onTap: () {
                     Navigator.push(

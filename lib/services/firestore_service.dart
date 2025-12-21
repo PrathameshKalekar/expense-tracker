@@ -50,21 +50,6 @@ class FirestoreService {
     });
   }
 
-  // Delete a group
-  Future<void> deleteGroup(String groupId) async {
-    // Delete all expenses in the group first
-    final expensesSnapshot = await _expensesCollection
-        .where('groupId', isEqualTo: groupId)
-        .get();
-
-    for (var doc in expensesSnapshot.docs) {
-      await doc.reference.delete();
-    }
-
-    // Delete the group
-    await _groupsCollection.doc(groupId).delete();
-  }
-
   // Add an expense to a group
   Future<String> addExpense(String groupId, String title, double amount) async {
     final expenseData = {
@@ -72,10 +57,18 @@ class FirestoreService {
       'title': title,
       'amount': amount,
       'createdAt': DateTime.now().toIso8601String(),
+      'dontCount': false,
     };
 
     final docRef = await _expensesCollection.add(expenseData);
     return docRef.id;
+  }
+
+  // Toggle don't count status for an expense
+  Future<void> toggleExpenseDontCount(String expenseId, bool dontCount) async {
+    await _expensesCollection.doc(expenseId).update({
+      'dontCount': dontCount,
+    });
   }
 
   // Get all expenses for a group
@@ -98,7 +91,7 @@ class FirestoreService {
     await _expensesCollection.doc(expenseId).delete();
   }
 
-  // Get total expenses for a group
+  // Get total expenses for a group (excluding don't count expenses)
   Future<double> getTotalExpenses(String groupId) async {
     final snapshot = await _expensesCollection
         .where('groupId', isEqualTo: groupId)
@@ -107,7 +100,10 @@ class FirestoreService {
     double total = 0;
     for (var doc in snapshot.docs) {
       final data = doc.data() as Map<String, dynamic>;
-      total += (data['amount'] ?? 0).toDouble();
+      final dontCount = data['dontCount'] ?? false;
+      if (!dontCount) {
+        total += (data['amount'] ?? 0).toDouble();
+      }
     }
     return total;
   }
