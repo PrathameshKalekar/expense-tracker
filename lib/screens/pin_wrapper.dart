@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-// ignore: unused_import
-import 'package:flutter/services.dart';
 import '../services/secure_storage_service.dart';
 import 'pin_setup_screen.dart';
 import 'pin_auth_screen.dart';
@@ -13,7 +11,7 @@ class PinWrapper extends StatefulWidget {
   State<PinWrapper> createState() => _PinWrapperState();
 }
 
-class _PinWrapperState extends State<PinWrapper> with WidgetsBindingObserver {
+class _PinWrapperState extends State<PinWrapper> {
   bool _isAuthenticated = false;
   bool _isChecking = true;
   bool _needsPinSetup = false;
@@ -21,31 +19,7 @@ class _PinWrapperState extends State<PinWrapper> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
     _checkPinStatus();
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      // App went to background
-      setState(() {
-        _isAuthenticated = false;
-      });
-    } else if (state == AppLifecycleState.resumed) {
-      // App came back to foreground - check after a short delay
-      Future.delayed(const Duration(milliseconds: 300), () {
-        if (mounted && !_isAuthenticated && !_needsPinSetup) {
-          _showPinAuth();
-        }
-      });
-    }
   }
 
   Future<void> _checkPinStatus() async {
