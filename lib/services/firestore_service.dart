@@ -8,12 +8,10 @@ class FirestoreService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Groups Collection
-  CollectionReference get _groupsCollection =>
-      _firestore.collection('groups');
+  CollectionReference get _groupsCollection => _firestore.collection('groups');
 
   // Expenses Collection
-  CollectionReference get _expensesCollection =>
-      _firestore.collection('expenses');
+  CollectionReference get _expensesCollection => _firestore.collection('expenses');
 
   // Create a new group
   Future<String> createGroup(String name) async {
@@ -37,13 +35,8 @@ class FirestoreService {
       return Stream.value([]);
     }
 
-    return _groupsCollection
-        .where('userId', isEqualTo: user.uid)
-        .snapshots()
-        .map((snapshot) {
-      final groups = snapshot.docs
-          .map((doc) => GroupModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
-          .toList();
+    return _groupsCollection.where('userId', isEqualTo: user.uid).snapshots().map((snapshot) {
+      final groups = snapshot.docs.map((doc) => GroupModel.fromMap(doc.id, doc.data() as Map<String, dynamic>)).toList();
       // Sort by createdAt descending
       groups.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return groups;
@@ -57,29 +50,16 @@ class FirestoreService {
       'title': title,
       'amount': amount,
       'createdAt': DateTime.now().toIso8601String(),
-      'dontCount': false,
     };
 
     final docRef = await _expensesCollection.add(expenseData);
     return docRef.id;
   }
 
-  // Toggle don't count status for an expense
-  Future<void> toggleExpenseDontCount(String expenseId, bool dontCount) async {
-    await _expensesCollection.doc(expenseId).update({
-      'dontCount': dontCount,
-    });
-  }
-
   // Get all expenses for a group
   Stream<List<ExpenseModel>> getExpenses(String groupId) {
-    return _expensesCollection
-        .where('groupId', isEqualTo: groupId)
-        .snapshots()
-        .map((snapshot) {
-      final expenses = snapshot.docs
-          .map((doc) => ExpenseModel.fromMap(doc.id, doc.data() as Map<String, dynamic>))
-          .toList();
+    return _expensesCollection.where('groupId', isEqualTo: groupId).snapshots().map((snapshot) {
+      final expenses = snapshot.docs.map((doc) => ExpenseModel.fromMap(doc.id, doc.data() as Map<String, dynamic>)).toList();
       // Sort by createdAt descending
       expenses.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return expenses;
@@ -91,21 +71,46 @@ class FirestoreService {
     await _expensesCollection.doc(expenseId).delete();
   }
 
-  // Get total expenses for a group (excluding don't count expenses)
+  // Get total expenses for a group
   Future<double> getTotalExpenses(String groupId) async {
-    final snapshot = await _expensesCollection
-        .where('groupId', isEqualTo: groupId)
-        .get();
+    final snapshot = await _expensesCollection.where('groupId', isEqualTo: groupId).get();
 
     double total = 0;
     for (var doc in snapshot.docs) {
       final data = doc.data() as Map<String, dynamic>;
-      final dontCount = data['dontCount'] ?? false;
-      if (!dontCount) {
-        total += (data['amount'] ?? 0).toDouble();
-      }
+      total += (data['amount'] ?? 0).toDouble();
     }
     return total;
   }
-}
 
+  // Update a group
+  Future<void> updateGroup(String groupId, String name) async {
+    await _groupsCollection.doc(groupId).update({
+      'name': name,
+    });
+  }
+
+  // Delete a group and all its expenses
+  Future<void> deleteGroup(String groupId) async {
+    // First, delete all expenses in this group
+    final expensesSnapshot = await _expensesCollection.where('groupId', isEqualTo: groupId).get();
+
+    final batch = _firestore.batch();
+    for (var doc in expensesSnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+
+    // Then delete the group
+    batch.delete(_groupsCollection.doc(groupId));
+
+    await batch.commit();
+  }
+
+  // Update an expense
+  Future<void> updateExpense(String expenseId, String title, double amount) async {
+    await _expensesCollection.doc(expenseId).update({
+      'title': title,
+      'amount': amount,
+    });
+  }
+}

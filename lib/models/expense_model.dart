@@ -4,7 +4,6 @@ class ExpenseModel {
   final String title;
   final double amount;
   final DateTime createdAt;
-  final bool dontCount;
 
   ExpenseModel({
     required this.id,
@@ -12,7 +11,6 @@ class ExpenseModel {
     required this.title,
     required this.amount,
     required this.createdAt,
-    this.dontCount = false,
   });
 
   // Convert to Firestore document
@@ -22,7 +20,6 @@ class ExpenseModel {
       'title': title,
       'amount': amount,
       'createdAt': createdAt.toIso8601String(),
-      'dontCount': dontCount,
     };
   }
 
@@ -34,7 +31,6 @@ class ExpenseModel {
       title: map['title'] ?? '',
       amount: (map['amount'] ?? 0).toDouble(),
       createdAt: DateTime.parse(map['createdAt']),
-      dontCount: map['dontCount'] ?? false,
     );
   }
 }
