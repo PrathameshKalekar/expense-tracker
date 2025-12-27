@@ -44,12 +44,13 @@ class FirestoreService {
   }
 
   // Add an expense to a group
-  Future<String> addExpense(String groupId, String title, double amount) async {
+  Future<String> addExpense(String groupId, String title, double amount, {String? proofUrl}) async {
     final expenseData = {
       'groupId': groupId,
       'title': title,
       'amount': amount,
       'createdAt': DateTime.now().toIso8601String(),
+      if (proofUrl != null) 'proofUrl': proofUrl,
     };
 
     final docRef = await _expensesCollection.add(expenseData);
@@ -64,6 +65,15 @@ class FirestoreService {
       expenses.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       return expenses;
     });
+  }
+
+  // Get expense data before deletion (for proof image deletion)
+  Future<Map<String, dynamic>?> getExpenseData(String expenseId) async {
+    final doc = await _expensesCollection.doc(expenseId).get();
+    if (doc.exists) {
+      return doc.data() as Map<String, dynamic>?;
+    }
+    return null;
   }
 
   // Delete an expense
@@ -90,6 +100,12 @@ class FirestoreService {
     });
   }
 
+  // Get all expenses for a group (for proof image deletion)
+  Future<List<Map<String, dynamic>>> getExpensesDataForGroup(String groupId) async {
+    final expensesSnapshot = await _expensesCollection.where('groupId', isEqualTo: groupId).get();
+    return expensesSnapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+  }
+
   // Delete a group and all its expenses
   Future<void> deleteGroup(String groupId) async {
     // First, delete all expenses in this group
@@ -107,10 +123,27 @@ class FirestoreService {
   }
 
   // Update an expense
-  Future<void> updateExpense(String expenseId, String title, double amount) async {
-    await _expensesCollection.doc(expenseId).update({
+  Future<void> updateExpense(String expenseId, String title, double amount, {String? proofUrl}) async {
+    final updateData = <String, dynamic>{
       'title': title,
       'amount': amount,
-    });
+    };
+    if (proofUrl != null) {
+      updateData['proofUrl'] = proofUrl;
+    } else if (proofUrl == null && updateData.containsKey('proofUrl')) {
+      updateData['proofUrl'] = FieldValue.delete();
+    }
+    await _expensesCollection.doc(expenseId).update(updateData);
+  }
+
+  // Update proof URL for an expense
+  Future<void> updateExpenseProof(String expenseId, String? proofUrl) async {
+    final updateData = <String, dynamic>{};
+    if (proofUrl != null) {
+      updateData['proofUrl'] = proofUrl;
+    } else {
+      updateData['proofUrl'] = FieldValue.delete();
+    }
+    await _expensesCollection.doc(expenseId).update(updateData);
   }
 }

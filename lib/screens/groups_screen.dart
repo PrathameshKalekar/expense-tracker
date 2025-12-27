@@ -3,6 +3,7 @@ import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/biometric_service.dart';
 import '../services/secure_storage_service.dart';
+import '../services/cloudinary_service.dart';
 import '../models/group_model.dart';
 import 'expenses_screen.dart';
 import 'pin_setup_screen.dart';
@@ -16,10 +17,12 @@ class GroupsScreen extends StatefulWidget {
 
 class _GroupsScreenState extends State<GroupsScreen> {
   final _firestoreService = FirestoreService();
+  final _cloudinaryService = CloudinaryService();
   final _authService = AuthService();
   final _biometricService = BiometricService();
   final _groupNameController = TextEditingController();
   final _editGroupNameController = TextEditingController();
+  bool _isDeleting = false;
 
   @override
   void dispose() {
@@ -473,34 +476,104 @@ class _GroupsScreenState extends State<GroupsScreen> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: ElevatedButton(
-                      onPressed: () async {
-                        try {
-                          await _firestoreService.deleteGroup(group.id);
-                          if (mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: const Text('Group and expenses deleted successfully'),
-                                behavior: SnackBarBehavior.floating,
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                              ),
-                            );
-                          }
-                        } catch (e) {
-                          if (mounted) {
-                            Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Error: ${e.toString()}'),
-                                backgroundColor: Colors.red.shade400,
-                                behavior: SnackBarBehavior.floating,
-                              ),
-                            );
-                          }
-                        }
-                      },
+                      onPressed: _isDeleting
+                          ? null
+                          : () async {
+                              try {
+                                setState(() => _isDeleting = true);
+
+                                // Show loading dialog
+                                if (mounted) {
+                                  showDialog(
+                                    context: context,
+                                    barrierDismissible: false,
+                                    builder: (context) => WillPopScope(
+                                      onWillPop: () async => false,
+                                      child: Dialog(
+                                        backgroundColor: Colors.transparent,
+                                        elevation: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(24),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            borderRadius: BorderRadius.circular(16),
+                                          ),
+                                          child: Column(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const CircularProgressIndicator(),
+                                              const SizedBox(height: 16),
+                                              Text(
+                                                'Deleting group and expenses...',
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade700,
+                                                  fontSize: 14,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                'This may take a moment',
+                                                style: TextStyle(
+                                                  color: Colors.grey.shade500,
+                                                  fontSize: 12,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+
+                                // Get all expenses with proof images
+                                final expenses = await _firestoreService.getExpensesDataForGroup(group.id);
+
+                                // Delete all proof images
+                                for (var expense in expenses) {
+                                  final proofUrl = expense['proofUrl'] as String?;
+                                  if (proofUrl != null && proofUrl.isNotEmpty) {
+                                    try {
+                                      await _cloudinaryService.deleteProofImage(proofUrl);
+                                    } catch (e) {
+                                      // Continue even if image deletion fails
+                                    }
+                                  }
+                                }
+
+                                // Delete group and expenses from Firestore
+                                await _firestoreService.deleteGroup(group.id);
+
+                                setState(() => _isDeleting = false);
+
+                                if (mounted) {
+                                  Navigator.pop(context); // Close loading dialog
+                                  Navigator.pop(context); // Close delete confirmation dialog
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: const Text('Group and expenses deleted successfully'),
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                setState(() => _isDeleting = false);
+                                if (mounted) {
+                                  Navigator.pop(context); // Close loading dialog
+                                  Navigator.pop(context); // Close delete confirmation dialog
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Error: ${e.toString()}'),
+                                      backgroundColor: Colors.red.shade400,
+                                      behavior: SnackBarBehavior.floating,
+                                    ),
+                                  );
+                                }
+                              }
+                            },
                       style: ElevatedButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 16),
                         shape: RoundedRectangleBorder(
@@ -510,7 +583,16 @@ class _GroupsScreenState extends State<GroupsScreen> {
                         foregroundColor: Colors.white,
                         elevation: 0,
                       ),
-                      child: const Text('Delete'),
+                      child: _isDeleting
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                              ),
+                            )
+                          : const Text('Delete'),
                     ),
                   ),
                 ],

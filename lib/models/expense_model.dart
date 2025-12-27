@@ -4,6 +4,7 @@ class ExpenseModel {
   final String title;
   final double amount;
   final DateTime createdAt;
+  final String? proofUrl;
 
   ExpenseModel({
     required this.id,
@@ -11,6 +12,7 @@ class ExpenseModel {
     required this.title,
     required this.amount,
     required this.createdAt,
+    this.proofUrl,
   });
 
   // Convert to Firestore document
@@ -20,6 +22,7 @@ class ExpenseModel {
       'title': title,
       'amount': amount,
       'createdAt': createdAt.toIso8601String(),
+      if (proofUrl != null) 'proofUrl': proofUrl,
     };
   }
 
@@ -31,7 +34,7 @@ class ExpenseModel {
       title: map['title'] ?? '',
       amount: (map['amount'] ?? 0).toDouble(),
       createdAt: DateTime.parse(map['createdAt']),
+      proofUrl: map['proofUrl'] as String?,
     );
   }
 }
-
