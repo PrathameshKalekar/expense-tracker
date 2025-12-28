@@ -1,10 +1,20 @@
+import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:pdf/pdf.dart';
+import 'package:pdf/widgets.dart' as pw;
+import 'package:share_plus/share_plus.dart';
+import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth_service.dart';
 import '../services/firestore_service.dart';
 import '../services/biometric_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/cloudinary_service.dart';
 import '../models/group_model.dart';
+import '../models/expense_model.dart';
 import 'expenses_screen.dart';
 import 'pin_setup_screen.dart';
 
@@ -227,6 +237,24 @@ class _GroupsScreenState extends State<GroupsScreen> {
                 onTap: () {
                   Navigator.pop(context);
                   _showEditGroupDialog(group);
+                },
+              ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    Icons.share_outlined,
+                    color: Colors.blue.shade600,
+                  ),
+                ),
+                title: const Text('Share Expense'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _shareExpensesAsPdf(group);
                 },
               ),
               ListTile(
@@ -1015,5 +1043,289 @@ class _GroupsScreenState extends State<GroupsScreen> {
     } else {
       return '${date.day}/${date.month}/${date.year}';
     }
+  }
+
+  Future<void> _shareExpensesAsPdf(GroupModel group) async {
+    try {
+      // Show loading dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => WillPopScope(
+            onWillPop: () async => false,
+            child: Dialog(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              child: Container(
+                padding: const EdgeInsets.all(24),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Generating PDF...',
+                      style: TextStyle(
+                        color: Colors.grey.shade700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      }
+
+      // Get all expenses for the group with proper document IDs
+      final expensesCollection = FirebaseFirestore.instance.collection('expenses');
+      final expensesSnapshot = await expensesCollection.where('groupId', isEqualTo: group.id).get();
+
+      if (expensesSnapshot.docs.isEmpty) {
+        if (mounted) {
+          Navigator.pop(context); // Close loading dialog
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('No expenses to share'),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+        return;
+      }
+
+      // Convert to ExpenseModel list with proper IDs
+      final expenses = expensesSnapshot.docs.map((doc) {
+        return ExpenseModel.fromMap(doc.id, doc.data());
+      }).toList();
+
+      // Sort by date (newest first)
+      expenses.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      // Calculate total
+      final total = expenses.fold<double>(0, (sum, expense) => sum + expense.amount);
+
+      // Format currency with "Rs" prefix (PDF doesn't support ₹ symbol well)
+      String formatCurrency(double amount) {
+        return 'Rs ${amount.toStringAsFixed(2)}';
+      }
+
+      // Store expense URLs with their indices for later loading
+      final Map<int, String> expenseImageUrls = {};
+      for (int i = 0; i < expenses.length; i++) {
+        final expense = expenses[i];
+        if (expense.proofUrl != null && expense.proofUrl!.isNotEmpty) {
+          final url = expense.proofUrl!.trim();
+          if (url.isNotEmpty) {
+            expenseImageUrls[i] = url;
+          }
+        }
+      }
+
+      // Remove emojis from group name (PDF doesn't support emojis well)
+      String cleanGroupName = _removeEmojis(group.name);
+
+      // Create PDF
+      final pdf = pw.Document();
+
+      // Build expense widgets list - create each widget independently
+      final List<pw.Widget> expenseWidgets = [];
+
+      for (int index = 0; index < expenses.length; index++) {
+        final expense = expenses[index];
+
+        // Remove emojis from expense title
+        String cleanTitle = _removeEmojis(expense.title);
+
+        // Build expense children list
+        final List<pw.Widget> expenseChildren = [
+          // Expense number and title
+          pw.Row(
+            mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+            children: [
+              pw.Expanded(
+                child: pw.Text(
+                  '${index + 1}. $cleanTitle',
+                  style: pw.TextStyle(
+                    fontSize: 16,
+                    fontWeight: pw.FontWeight.bold,
+                  ),
+                ),
+              ),
+              pw.Text(
+                formatCurrency(expense.amount),
+                style: pw.TextStyle(
+                  fontSize: 16,
+                  fontWeight: pw.FontWeight.bold,
+                  color: PdfColors.blue700,
+                ),
+              ),
+            ],
+          ),
+          pw.SizedBox(height: 4),
+          pw.Text(
+            DateFormat('MMM dd, yyyy').format(expense.createdAt),
+            style: pw.TextStyle(
+              fontSize: 10,
+              color: PdfColors.grey600,
+            ),
+          ),
+        ];
+
+        // Add proof image if available - load fresh for each expense
+        final imageUrl = expenseImageUrls[index];
+        if (imageUrl != null && imageUrl.isNotEmpty) {
+          try {
+            // Load image fresh for this specific expense
+            final imageData = await _loadImageFromUrl(imageUrl);
+            if (imageData.isNotEmpty && imageData.lengthInBytes > 100) {
+              // Create a completely independent copy - use List.generate to force new instance
+              final imageBytesList = List<int>.generate(
+                imageData.length,
+                (i) => imageData[i],
+              );
+              final freshImageBytes = Uint8List.fromList(imageBytesList);
+
+              // Create a new MemoryImage instance for this expense
+              final imageProvider = pw.MemoryImage(freshImageBytes);
+
+              // Create the image widget immediately
+              final imageWidget = pw.Container(
+                width: 400,
+                height: 300,
+                child: pw.Center(
+                  child: pw.Image(
+                    imageProvider,
+                    fit: pw.BoxFit.contain,
+                  ),
+                ),
+              );
+
+              expenseChildren.add(pw.SizedBox(height: 12));
+              expenseChildren.add(imageWidget);
+            }
+          } catch (e) {
+            // If image fails to add, skip it silently
+          }
+        }
+
+        // Create the expense container widget
+        final expenseWidget = pw.Container(
+          margin: const pw.EdgeInsets.only(bottom: 25),
+          padding: const pw.EdgeInsets.all(12),
+          decoration: pw.BoxDecoration(
+            border: pw.Border.all(color: PdfColors.grey300, width: 1),
+            borderRadius: pw.BorderRadius.circular(8),
+          ),
+          child: pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: expenseChildren,
+          ),
+        );
+
+        expenseWidgets.add(expenseWidget);
+      }
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(40),
+          build: (pw.Context context) {
+            return [
+              // Header
+              pw.Container(
+                margin: const pw.EdgeInsets.only(bottom: 30),
+                child: pw.Column(
+                  crossAxisAlignment: pw.CrossAxisAlignment.start,
+                  children: [
+                    pw.Text(
+                      cleanGroupName,
+                      style: pw.TextStyle(
+                        fontSize: 28,
+                        fontWeight: pw.FontWeight.bold,
+                      ),
+                    ),
+                    pw.SizedBox(height: 12),
+                    pw.Text(
+                      'Total Expenses: ${formatCurrency(total)} | Number of Expenses: ${expenses.length}',
+                      style: pw.TextStyle(
+                        fontSize: 14,
+                        color: PdfColors.grey700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Expenses list
+              ...expenseWidgets,
+            ];
+          },
+        ),
+      );
+
+      // Save PDF to temporary file
+      final output = await getTemporaryDirectory();
+      final file = File('${output.path}/expenses_${group.id}_${DateTime.now().millisecondsSinceEpoch}.pdf');
+      await file.writeAsBytes(await pdf.save());
+
+      // Close loading dialog
+      if (mounted) {
+        Navigator.pop(context);
+      }
+
+      // Share the PDF
+      if (mounted) {
+        await Share.shareXFiles(
+          [XFile(file.path)],
+          text: 'Expense Report: ${group.name}',
+          subject: 'Expense Report',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog if still open
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error generating PDF: ${e.toString()}'),
+            backgroundColor: Colors.red.shade400,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<Uint8List> _loadImageFromUrl(String url) async {
+    try {
+      final response = await http.get(Uri.parse(url));
+      if (response.statusCode == 200 && response.bodyBytes.isNotEmpty && response.bodyBytes.lengthInBytes > 100) {
+        // Return a copy to ensure it's a separate instance
+        return Uint8List.fromList(response.bodyBytes);
+      }
+      return Uint8List(0);
+    } catch (e) {
+      return Uint8List(0);
+    }
+  }
+
+  // Remove emojis from text (PDF doesn't support emojis well)
+  String _removeEmojis(String text) {
+    // Remove emojis using regex
+    return text
+        .replaceAll(
+          RegExp(
+            r'[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]',
+            unicode: true,
+          ),
+          '',
+        )
+        .trim();
   }
 }

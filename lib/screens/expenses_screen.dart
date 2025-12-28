@@ -168,7 +168,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: .1),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -296,7 +296,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                    color: Theme.of(context).colorScheme.primary.withValues(alpha: .1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(
@@ -375,7 +375,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: .1),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -389,7 +389,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: .1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -551,13 +551,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                               end: Alignment.bottomRight,
                               colors: [
                                 Theme.of(context).colorScheme.primary,
-                                Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                                Theme.of(context).colorScheme.primary.withValues(alpha: .8),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: .3),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4),
                               ),
@@ -706,7 +706,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.1),
+                color: Colors.black.withValues(alpha: .1),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
@@ -906,7 +906,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
               borderRadius: BorderRadius.circular(24),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
+                  color: Colors.black.withValues(alpha: .1),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
                 ),
@@ -920,7 +920,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: .1),
                       shape: BoxShape.circle,
                     ),
                     child: Icon(
@@ -1083,13 +1083,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                               end: Alignment.bottomRight,
                               colors: [
                                 Theme.of(context).colorScheme.primary,
-                                Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                                Theme.of(context).colorScheme.primary.withValues(alpha: .8),
                               ],
                             ),
                             borderRadius: BorderRadius.circular(12),
                             boxShadow: [
                               BoxShadow(
-                                color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                                color: Theme.of(context).colorScheme.primary.withValues(alpha: .3),
                                 blurRadius: 8,
                                 offset: const Offset(0, 4),
                               ),
@@ -1317,13 +1317,13 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     end: Alignment.bottomRight,
                     colors: [
                       Theme.of(context).colorScheme.primary,
-                      Theme.of(context).colorScheme.primary.withOpacity(0.8),
+                      Theme.of(context).colorScheme.primary.withValues(alpha: .8),
                     ],
                   ),
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: .3),
                       blurRadius: 15,
                       offset: const Offset(0, 5),
                     ),
@@ -1336,14 +1336,14 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                       children: [
                         Icon(
                           Icons.account_balance_wallet_rounded,
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: .9),
                           size: 20,
                         ),
                         const SizedBox(width: 8),
                         Text(
                           'Total Expenses',
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
+                            color: Colors.white.withValues(alpha: .9),
                             fontSize: 16,
                             fontWeight: FontWeight.w500,
                           ),
@@ -1472,7 +1472,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                                           gradient: LinearGradient(
                                             colors: [
                                               Theme.of(context).colorScheme.primary,
-                                              Theme.of(context).colorScheme.primary.withOpacity(0.7),
+                                              Theme.of(context).colorScheme.primary.withValues(alpha: .7),
                                             ],
                                           ),
                                           borderRadius: BorderRadius.circular(12),
@@ -1615,7 +1615,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.2),
+                color: Colors.black.withValues(alpha: .2),
                 blurRadius: 20,
                 offset: const Offset(0, 10),
               ),
